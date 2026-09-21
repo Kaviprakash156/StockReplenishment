@@ -1,0 +1,360 @@
+﻿@page "/requests"
+
+@using StockReplenishment.Application.DTOs.ReplenishmentRequests
+@using StockReplenishment.Web.Services
+@using MudBlazor
+@using StockReplenishment.Domain.Enums
+
+@inject ReplenishmentApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Replenishment Requests</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-6">
+
+    <MudStack Row="true"
+              Justify="Justify.SpaceBetween"
+              AlignItems="AlignItems.Center"
+              Class="mb-4">
+
+        <MudText Typo="Typo.h4">
+            Replenishment Requests
+        </MudText>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateRequest">
+            New Request
+        </MudButton>
+
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4">
+
+        <MudText Typo="Typo.h6" Class="mb-3">
+            Filters
+        </MudText>
+
+        <MudGrid>
+
+            <MudItem xs="12" sm="4">
+
+                <MudSelect T="RequestStatus?"
+                           Label="Status"
+                           Variant="Variant.Outlined"
+                           @bind-Value="_status">
+
+                    <MudSelectItem Value="@((RequestStatus?)null)">
+                        All
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestStatus?)RequestStatus.Draft)">
+                        Draft
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestStatus?)RequestStatus.Submitted)">
+                        Submitted
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestStatus?)RequestStatus.Approved)">
+                        Approved
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestStatus?)RequestStatus.Rejected)">
+                        Rejected
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestStatus?)RequestStatus.Fulfilled)">
+                        Fulfilled
+                    </MudSelectItem>
+
+                </MudSelect>
+
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+
+                <MudSelect T="RequestPriority?"
+                           Label="Priority"
+                           Variant="Variant.Outlined"
+                           @bind-Value="_priority">
+
+                    <MudSelectItem Value="@((RequestPriority?)null)">
+                        All
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestPriority?)RequestPriority.Low)">
+                        Low
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestPriority?)RequestPriority.Normal)">
+                        Normal
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="@((RequestPriority?)RequestPriority.Urgent)">
+                        Urgent
+                    </MudSelectItem>
+
+                </MudSelect>
+
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Class="mt-2"
+                           OnClick="ApplyFilters">
+
+                    Apply Filters
+
+                </MudButton>
+
+            </MudItem>
+
+        </MudGrid>
+
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <MudPaper Class="pa-6">
+
+            <MudStack AlignItems="AlignItems.Center">
+
+                <MudProgressCircular Indeterminate="true"
+                                     Color="Color.Primary" />
+
+                <MudText>
+                    Loading requests...
+                </MudText>
+
+            </MudStack>
+
+        </MudPaper>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">
+            @_errorMessage
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper>
+
+            <MudTable Items="_requests"
+                      Hover="true"
+                      Striped="true"
+                      Bordered="true">
+
+                <HeaderContent>
+
+                    <MudTh>ID</MudTh>
+                    <MudTh>Location</MudTh>
+                    <MudTh>Priority</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Created By</MudTh>
+                    <MudTh>Created At</MudTh>
+                    <MudTh>Stock Validation</MudTh>
+                    <MudTh></MudTh>
+
+                </HeaderContent>
+
+                <RowTemplate>
+
+                    <MudTd DataLabel="ID">
+                        @context.Id
+                    </MudTd>
+
+                    <MudTd DataLabel="Location">
+                        @context.StockLocationCode
+                    </MudTd>
+
+                    <MudTd DataLabel="Priority">
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@GetPriorityColor(context.Priority)">
+                            @context.Priority
+                        </MudChip>
+                    </MudTd>
+
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@GetStatusColor(context.Status)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+
+                    <MudTd DataLabel="Created By">
+                        @context.CreatedBy
+                    </MudTd>
+
+                    <MudTd DataLabel="Created At">
+                        @context.CreatedAt.ToLocalTime()
+                    </MudTd>
+
+                    <MudTd DataLabel="Stock Validation">
+
+                        @if (context.StockValidationStatus == "Pending")
+                        {
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="Color.Warning">
+                                Pending
+                            </MudChip>
+                        }
+                        else if (context.StockValidationStatus == "Available")
+                        {
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="Color.Success">
+                                Available
+                            </MudChip>
+                        }
+                        else if (context.StockValidationStatus == "Unavailable")
+                        {
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="Color.Error">
+                                Unavailable
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2">
+                                @context.StockValidationStatus
+                            </MudText>
+                        }
+
+                    </MudTd>
+
+                    <MudTd>
+
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => ViewRequest(context.Id))">
+                            View
+                        </MudButton>
+
+                    </MudTd>
+
+                </RowTemplate>
+
+            </MudTable>
+
+            @if (_totalPages > 1)
+            {
+                <MudStack AlignItems="AlignItems.Center"
+                          Class="pa-4">
+
+                    <MudPagination Count="_totalPages"
+                                   Selected="_page"
+                                   SelectedChanged="PageChanged" />
+
+                </MudStack>
+            }
+
+        </MudPaper>
+    }
+
+</MudContainer>
+
+@code {
+
+    private List<ReplenishmentRequestListDto> _requests = new();
+
+    private RequestStatus? _status;
+    private RequestPriority? _priority;
+
+    private int _page = 1;
+    private const int PageSize = 10;
+
+    private int _totalPages;
+
+    private bool _loading;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRequests();
+    }
+
+    private async Task LoadRequests()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await ApiClient.GetRequestsAsync(
+                status: _status,
+                priority: _priority,
+                page: _page,
+                pageSize: PageSize);
+
+            _requests = result.Items.ToList();
+            _totalPages = result.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to load requests: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        _page = 1;
+
+        await LoadRequests();
+    }
+
+    private async Task PageChanged(int page)
+    {
+        _page = page;
+
+        await LoadRequests();
+    }
+
+    private void CreateRequest()
+    {
+        Navigation.NavigateTo("/requests/create");
+    }
+
+    private void ViewRequest(int id)
+    {
+        Navigation.NavigateTo($"/requests/{id}");
+    }
+
+    private static Color GetPriorityColor(string priority)
+    {
+        return priority switch
+        {
+            "Urgent" => Color.Error,
+            "Normal" => Color.Primary,
+            "Low" => Color.Default,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Draft" => Color.Default,
+            "Submitted" => Color.Warning,
+            "Approved" => Color.Info,
+            "Rejected" => Color.Error,
+            "Fulfilled" => Color.Success,
+            _ => Color.Default
+        };
+    }
+}

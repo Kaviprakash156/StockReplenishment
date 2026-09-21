@@ -1,0 +1,344 @@
+﻿@page "/requests/create"
+
+@using StockReplenishment.Application.DTOs.ReplenishmentRequests
+@using StockReplenishment.Application.DTOs.StockLocations
+@using StockReplenishment.Web.Services
+@using MudBlazor
+
+@inject ReplenishmentApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>New Replenishment Request</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+
+    <MudText Typo="Typo.h4" Class="mb-4">
+        New Replenishment Request
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudStack AlignItems="AlignItems.Center" Class="pa-6">
+            <MudProgressCircular Indeterminate="true"
+                                 Color="Color.Primary" />
+            <MudText>Loading...</MudText>
+        </MudStack>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            @_errorMessage
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-4">
+
+            <MudText Typo="Typo.h6" Class="mb-4">
+                Request Details
+            </MudText>
+
+            <MudGrid>
+
+                <MudItem xs="12" sm="6">
+
+                    <MudSelect T="int"
+                               Label="Stock Location"
+                               Variant="Variant.Outlined"
+                               @bind-Value="_model.StockLocationId"
+                               Required="true">
+
+                        @foreach (var location in _locations)
+                        {
+                            <MudSelectItem T="int"
+                                           Value="@location.Id">
+                                @location.Code - @location.Name
+                            </MudSelectItem>
+                        }
+
+                    </MudSelect>
+
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+
+                    <MudSelect T="int"
+                               Label="Priority"
+                               Variant="Variant.Outlined"
+                               @bind-Value="_model.Priority">
+
+                        <MudSelectItem T="int" Value="1">
+                            Low
+                        </MudSelectItem>
+
+                        <MudSelectItem T="int" Value="2">
+                            Normal
+                        </MudSelectItem>
+
+                        <MudSelectItem T="int" Value="3">
+                            Urgent
+                        </MudSelectItem>
+
+                    </MudSelect>
+
+                </MudItem>
+
+                <MudItem xs="12">
+
+                    <MudTextField T="string"
+                                  Label="Created By"
+                                  Variant="Variant.Outlined"
+                                  @bind-Value="_model.CreatedBy"
+                                  Required="true" />
+
+                </MudItem>
+
+            </MudGrid>
+
+        </MudPaper>
+
+        <MudPaper Class="pa-4 mt-4">
+
+            <MudStack Row="true"
+                      Justify="Justify.SpaceBetween"
+                      AlignItems="AlignItems.Center"
+                      Class="mb-4">
+
+                <MudText Typo="Typo.h6">
+                    Request Items
+                </MudText>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddItem">
+                    Add Item
+                </MudButton>
+
+            </MudStack>
+
+            @foreach (var item in _model.Items)
+            {
+                <MudPaper Outlined="true"
+                          Class="pa-4 mb-3">
+
+                    <MudGrid>
+
+                        <MudItem xs="12" sm="4">
+
+                            <MudTextField T="string"
+                                          Label="Article Number"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="item.ArticleNumber"
+                                          Required="true" />
+
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+
+                            <MudTextField T="string"
+                                          Label="Description"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="item.Description"
+                                          Required="true" />
+
+                        </MudItem>
+
+                        <MudItem xs="12" sm="3">
+
+                            <MudNumericField T="int"
+                                             Label="Requested Quantity"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             @bind-Value="item.RequestedQuantity"
+                                             Required="true" />
+
+                        </MudItem>
+
+                        <MudItem xs="12" sm="1"
+                                 Class="d-flex align-center">
+
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Disabled="@(_model.Items.Count == 1)"
+                                           OnClick="@(() => RemoveItem(item))" />
+
+                        </MudItem>
+
+                    </MudGrid>
+
+                </MudPaper>
+            }
+
+        </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(_validationMessage))
+        {
+            <MudAlert Severity="Severity.Error"
+                      Class="mt-4">
+                @_validationMessage
+            </MudAlert>
+        }
+
+        <MudStack Row="true"
+                  Justify="Justify.FlexEnd"
+                  Class="mt-4">
+
+            <MudButton Variant="Variant.Text"
+                       OnClick="Cancel">
+                Cancel
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="_saving"
+                       OnClick="CreateRequest">
+
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small"
+                                         Indeterminate="true"
+                                         Class="me-2" />
+                }
+
+                Create Draft
+
+            </MudButton>
+
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+
+    private CreateReplenishmentRequestDto _model =
+        new()
+        {
+            Priority = 2,
+            Items = new List<CreateReplenishmentRequestItemDto>
+            {
+                new()
+            }
+        };
+
+    private List<StockLocationDto> _locations = new();
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _errorMessage;
+    private string? _validationMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _locations =
+                await ApiClient.GetStockLocationsAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to load stock locations: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void AddItem()
+    {
+        _model.Items.Add(
+            new CreateReplenishmentRequestItemDto());
+    }
+
+    private void RemoveItem(
+        CreateReplenishmentRequestItemDto item)
+    {
+        if (_model.Items.Count > 1)
+        {
+            _model.Items.Remove(item);
+        }
+    }
+
+    private async Task CreateRequest()
+    {
+        _validationMessage = null;
+
+        if (_model.StockLocationId <= 0)
+        {
+            _validationMessage =
+                "Please select a stock location.";
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.CreatedBy))
+        {
+            _validationMessage =
+                "Please enter Created By.";
+
+            return;
+        }
+
+        if (_model.Items.Count == 0)
+        {
+            _validationMessage =
+                "At least one item is required.";
+
+            return;
+        }
+
+        foreach (var item in _model.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.ArticleNumber))
+            {
+                _validationMessage =
+                    "Article number is required.";
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(item.Description))
+            {
+                _validationMessage =
+                    "Item description is required.";
+
+                return;
+            }
+
+            if (item.RequestedQuantity <= 0)
+            {
+                _validationMessage =
+                    "Requested quantity must be greater than zero.";
+
+                return;
+            }
+        }
+
+        _saving = true;
+
+        try
+        {
+            var created =
+                await ApiClient.CreateRequestAsync(_model);
+
+            Navigation.NavigateTo(
+                $"/requests/{created.Id}");
+        }
+        catch (Exception ex)
+        {
+            _validationMessage =
+                $"Unable to create request: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/requests");
+    }
+}

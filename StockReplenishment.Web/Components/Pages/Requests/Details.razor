@@ -1,0 +1,1095 @@
+﻿@page "/requests/{id:int}"
+
+@using StockReplenishment.Application.DTOs.ReplenishmentRequests
+@using StockReplenishment.Web.Services
+@using MudBlazor
+
+@implements IDisposable
+
+@inject ReplenishmentApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Request Details</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+
+    @if (_loading)
+    {
+        <MudStack AlignItems="AlignItems.Center"
+                  Class="pa-6">
+
+            <MudProgressCircular Indeterminate="true"
+                                 Color="Color.Primary" />
+
+            <MudText>
+                Loading request...
+            </MudText>
+
+        </MudStack>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">
+            @_errorMessage
+        </MudAlert>
+
+        <MudButton Class="mt-4"
+                   Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="GoBack">
+
+            Back to Requests
+
+        </MudButton>
+    }
+    else if (_request is not null)
+    {
+        <!-- ================================================= -->
+        <!-- PAGE HEADER                                      -->
+        <!-- ================================================= -->
+
+        <MudStack Row="true"
+                  Justify="Justify.SpaceBetween"
+                  AlignItems="AlignItems.Center"
+                  Class="mb-4">
+
+            <MudText Typo="Typo.h4">
+                Replenishment Request #@_request.Id
+            </MudText>
+
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       OnClick="GoBack">
+
+                Back
+
+            </MudButton>
+
+        </MudStack>
+
+
+        <!-- ================================================= -->
+        <!-- REQUEST INFORMATION                              -->
+        <!-- ================================================= -->
+
+        <MudPaper Class="pa-4 mb-4">
+
+            <MudText Typo="Typo.h6"
+                     Class="mb-4">
+
+                Request Information
+
+            </MudText>
+
+            <MudGrid>
+
+                <!-- Location -->
+
+                <MudItem xs="12" sm="6">
+
+                    <MudText Typo="Typo.body2">
+                        <strong>Location</strong>
+                    </MudText>
+
+                    <MudText>
+                        @_request.StockLocationCode
+                        -
+                        @_request.StockLocationName
+                    </MudText>
+
+                </MudItem>
+
+
+                <!-- Created By -->
+
+                <MudItem xs="12" sm="6">
+
+                    <MudText Typo="Typo.body2">
+                        <strong>Created By</strong>
+                    </MudText>
+
+                    <MudText>
+                        @_request.CreatedBy
+                    </MudText>
+
+                </MudItem>
+
+
+                <!-- Priority -->
+
+                <MudItem xs="12" sm="4">
+
+                    <MudText Typo="Typo.body2">
+                        <strong>Priority</strong>
+                    </MudText>
+
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@GetPriorityColor(
+                                                         _request.Priority)">
+
+                        @_request.Priority
+
+                    </MudChip>
+
+                </MudItem>
+
+
+                <!-- Status -->
+
+                <MudItem xs="12" sm="4">
+
+                    <MudText Typo="Typo.body2">
+                        <strong>Status</strong>
+                    </MudText>
+
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@GetStatusColor(
+                                                         _request.Status)">
+
+                        @_request.Status
+
+                    </MudChip>
+
+                </MudItem>
+
+
+                <!-- Stock Validation -->
+
+                <MudItem xs="12" sm="4">
+
+                    <MudText Typo="Typo.body2">
+                        <strong>Stock Validation</strong>
+                    </MudText>
+
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@GetValidationColor(
+                                                         _request.StockValidationStatus)">
+
+                        @_request.StockValidationStatus
+
+                    </MudChip>
+
+                </MudItem>
+
+            </MudGrid>
+
+        </MudPaper>
+
+
+        <!-- ================================================= -->
+        <!-- STOCK VALIDATION                                 -->
+        <!-- ================================================= -->
+
+        <MudPaper Class="pa-4 mb-4">
+
+            <MudText Typo="Typo.h6"
+                     Class="mb-4">
+
+                Stock Validation
+
+            </MudText>
+
+            @if (!string.IsNullOrWhiteSpace(
+                _request.StockValidationMessage))
+            {
+                <MudAlert Severity="@GetValidationSeverity(
+                                        _request.StockValidationStatus)">
+
+                    @_request.StockValidationMessage
+
+                </MudAlert>
+            }
+
+            @if (_request.StockValidationCompletedAt.HasValue)
+            {
+                <MudText Typo="Typo.body2"
+                         Class="mt-2">
+
+                    Completed:
+                    @(_request.StockValidationCompletedAt
+                        .Value.ToLocalTime())
+
+                </MudText>
+            }
+
+        </MudPaper>
+
+
+        <!-- ================================================= -->
+        <!-- REQUEST ITEMS                                    -->
+        <!-- ================================================= -->
+
+        <MudPaper Class="pa-4 mb-4">
+
+            <MudText Typo="Typo.h6"
+                     Class="mb-4">
+
+                Request Items
+
+            </MudText>
+
+            <MudTable Items="_request.Items"
+                      Hover="true"
+                      Striped="true"
+                      Bordered="true">
+
+                <HeaderContent>
+
+                    <MudTh>Article Number</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh>Requested</MudTh>
+                    <MudTh>Fulfilled</MudTh>
+
+                </HeaderContent>
+
+                <RowTemplate>
+
+                    <MudTd DataLabel="Article Number">
+                        @context.ArticleNumber
+                    </MudTd>
+
+                    <MudTd DataLabel="Description">
+                        @context.Description
+                    </MudTd>
+
+                    <MudTd DataLabel="Requested">
+                        @context.RequestedQuantity
+                    </MudTd>
+
+                    <MudTd DataLabel="Fulfilled">
+                        @context.FulfilledQuantity
+                    </MudTd>
+
+                </RowTemplate>
+
+            </MudTable>
+
+        </MudPaper>
+
+
+        <!-- ================================================= -->
+        <!-- DRAFT ACTION                                    -->
+        <!-- ================================================= -->
+        @if (_request.Status == "Draft")
+        {
+            <MudPaper Class="pa-4 mb-4">
+
+                <MudStack Row="true"
+                          Justify="Justify.FlexEnd">
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="_submitting"
+                               OnClick="SubmitRequest">
+
+                        @if (_submitting)
+                        {
+                            <MudProgressCircular Size="Size.Small"
+                                                 Indeterminate="true"
+                                                 Class="me-2" />
+                        }
+
+                        Submit Request
+
+                    </MudButton>
+
+                </MudStack>
+
+            </MudPaper>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- STOCK VALIDATION PENDING                         -->
+        <!-- ================================================= -->
+        @if (_request.Status == "Submitted" &&
+                     _request.StockValidationStatus == "Pending")
+        {
+            <MudAlert Severity="Severity.Info"
+                      Class="mb-4">
+
+                Stock availability validation is running.
+                This page will automatically refresh when
+                the result is available.
+
+            </MudAlert>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- REVIEWER ACTIONS                                -->
+        <!-- ================================================= -->
+        @if (_request.Status == "Submitted" &&
+                     _request.StockValidationStatus == "Available")
+        {
+            <MudPaper Class="pa-4 mb-4">
+
+                <MudText Typo="Typo.h6"
+                         Class="mb-4">
+
+                    Reviewer Actions
+
+                </MudText>
+
+                <MudStack Row="true"
+                          Justify="Justify.FlexEnd"
+                          Spacing="2">
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               Disabled="_processing"
+                               OnClick="OpenRejectDialog">
+
+                        Reject
+
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Disabled="_processing"
+                               OnClick="ApproveRequest">
+
+                        Approve
+
+                    </MudButton>
+
+                </MudStack>
+
+            </MudPaper>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- REJECTION FORM                                  -->
+        <!-- ================================================= -->
+        @if (_showRejectDialog)
+        {
+            <MudPaper Class="pa-4 mb-4">
+
+                <MudText Typo="Typo.h6"
+                         Class="mb-4">
+
+                    Reject Request
+
+                </MudText>
+
+                <MudTextField T="string"
+                              Label="Rejection Reason"
+                              Variant="Variant.Outlined"
+                              Lines="4"
+                              MaxLength="500"
+                              Counter="500"
+                              Required="true"
+                              @bind-Value="_rejectionReason" />
+
+                <MudStack Row="true"
+                          Justify="Justify.FlexEnd"
+                          Class="mt-4"
+                          Spacing="2">
+
+                    <MudButton Variant="Variant.Text"
+                               Disabled="_processing"
+                               OnClick="CloseRejectDialog">
+
+                        Cancel
+
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Error"
+                               Disabled="_processing"
+                               OnClick="RejectRequest">
+
+                        Reject Request
+
+                    </MudButton>
+
+                </MudStack>
+
+            </MudPaper>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- REJECTED RESULT                                 -->
+        <!-- ================================================= -->
+        @if (_request.Status == "Rejected")
+        {
+            <MudAlert Severity="Severity.Error"
+                      Class="mb-4">
+
+                <MudText Typo="Typo.subtitle1">
+                    Request Rejected
+                </MudText>
+
+                <MudText>
+                    @_request.RejectionReason
+                </MudText>
+
+            </MudAlert>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- FULFILLMENT                                     -->
+        <!-- ================================================= -->
+        @if (_request.Status == "Approved")
+        {
+            <MudPaper Class="pa-4 mb-4">
+
+                <MudText Typo="Typo.h6"
+                         Class="mb-4">
+
+                    Fulfillment
+
+                </MudText>
+
+                @foreach (var item in _request.Items)
+                {
+                    <MudPaper Outlined="true"
+                              Class="pa-3 mb-3">
+
+                        <MudGrid>
+
+                            <!-- Article -->
+
+                            <MudItem xs="12" sm="4">
+
+                                <MudText Typo="Typo.body2">
+                                    <strong>Article Number</strong>
+                                </MudText>
+
+                                <MudText>
+                                    @item.ArticleNumber
+                                </MudText>
+
+                            </MudItem>
+
+
+                            <!-- Requested -->
+
+                            <MudItem xs="12" sm="3">
+
+                                <MudText Typo="Typo.body2">
+                                    <strong>Requested</strong>
+                                </MudText>
+
+                                <MudText>
+                                    @item.RequestedQuantity
+                                </MudText>
+
+                            </MudItem>
+
+
+                            <!-- Fulfilled -->
+
+                            <MudItem xs="12" sm="5">
+
+                                <MudNumericField T="int"
+                                                 Label="Fulfilled Quantity"
+                                                 Variant="Variant.Outlined"
+                                                 Min="0"
+                                                 Max="@item.RequestedQuantity"
+                                                 Value="@GetFulfilledQuantity(item.Id)"
+                                                 ValueChanged="@(value =>
+                                                                                     SetFulfilledQuantity(
+                                                                                         item.Id,
+                                                                                         value))" />
+
+                            </MudItem>
+
+                        </MudGrid>
+
+                    </MudPaper>
+                }
+
+
+                @if (!string.IsNullOrWhiteSpace(
+                    _fulfillmentError))
+                {
+                    <MudAlert Severity="Severity.Error"
+                              Class="mb-4">
+
+                        @_fulfillmentError
+
+                    </MudAlert>
+                }
+
+
+                <MudStack Row="true"
+                          Justify="Justify.FlexEnd">
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="_processing"
+                               OnClick="FulfillRequest">
+
+                        @if (_processing)
+                        {
+                            <MudProgressCircular Size="Size.Small"
+                                                 Indeterminate="true"
+                                                 Class="me-2" />
+                        }
+
+                        Mark as Fulfilled
+
+                    </MudButton>
+
+                </MudStack>
+
+            </MudPaper>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- FULFILLED RESULT                                -->
+        <!-- ================================================= -->
+        @if (_request.Status == "Fulfilled")
+        {
+            <MudAlert Severity="Severity.Success"
+                      Class="mb-4">
+
+                Request has been fulfilled successfully.
+
+            </MudAlert>
+        }
+
+    }
+
+</MudContainer>
+
+
+@code {
+
+    [Parameter]
+    public int Id { get; set; }
+
+
+    // =========================================================
+    // State
+    // =========================================================
+
+    private ReplenishmentRequestDetailsDto? _request;
+
+    private bool _loading = true;
+
+    private bool _submitting;
+
+    private bool _processing;
+
+    private bool _showRejectDialog;
+
+    private string _rejectionReason = string.Empty;
+
+    private string? _errorMessage;
+
+    private string? _fulfillmentError;
+
+
+    // =========================================================
+    // Fulfillment State
+    // =========================================================
+
+    private readonly Dictionary<int, int>
+        _fulfillmentQuantities = new();
+
+
+    // =========================================================
+    // Polling
+    // =========================================================
+
+    private CancellationTokenSource?
+        _pollCancellationTokenSource;
+
+
+    // =========================================================
+    // Initialization
+    // =========================================================
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRequest();
+
+        StartPollingIfRequired();
+    }
+
+
+    // =========================================================
+    // Load Request
+    // =========================================================
+
+    private async Task LoadRequest()
+    {
+        try
+        {
+            _loading = true;
+
+            _errorMessage = null;
+
+            _request =
+                await ApiClient.GetRequestAsync(Id);
+
+            if (_request is null)
+            {
+                _errorMessage =
+                    $"Request #{Id} was not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to load request: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+
+    // =========================================================
+    // Start Polling
+    // =========================================================
+
+    private void StartPollingIfRequired()
+    {
+        if (_request is null)
+        {
+            return;
+        }
+
+        if (_request.Status != "Submitted")
+        {
+            return;
+        }
+
+        if (_request.StockValidationStatus != "Pending")
+        {
+            return;
+        }
+
+        _pollCancellationTokenSource =
+            new CancellationTokenSource();
+
+        _ = PollValidationStatusAsync(
+            _pollCancellationTokenSource.Token);
+    }
+
+
+    // =========================================================
+    // Poll Stock Validation
+    // =========================================================
+
+    private async Task PollValidationStatusAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(
+                    TimeSpan.FromSeconds(2),
+                    cancellationToken);
+
+                var request =
+                    await ApiClient.GetRequestAsync(Id);
+
+                if (request is null)
+                {
+                    break;
+                }
+
+                _request = request;
+
+                await InvokeAsync(
+                    StateHasChanged);
+
+                if (_request.Status != "Submitted" ||
+                    _request.StockValidationStatus != "Pending")
+                {
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when the component is disposed.
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to refresh validation status: {ex.Message}";
+
+            await InvokeAsync(
+                StateHasChanged);
+        }
+    }
+
+
+    // =========================================================
+    // Submit
+    // =========================================================
+
+    private async Task SubmitRequest()
+    {
+        _submitting = true;
+
+        _errorMessage = null;
+
+        try
+        {
+            await ApiClient.SubmitRequestAsync(Id);
+
+            await LoadRequest();
+
+            StartPollingIfRequired();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to submit request: {ex.Message}";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+
+    // =========================================================
+    // Approve
+    // =========================================================
+
+    private async Task ApproveRequest()
+    {
+        _processing = true;
+
+        _errorMessage = null;
+
+        try
+        {
+            await ApiClient.ApproveRequestAsync(Id);
+
+            await LoadRequest();
+
+            _fulfillmentQuantities.Clear();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to approve request: {ex.Message}";
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+
+    // =========================================================
+    // Reject Dialog
+    // =========================================================
+
+    private void OpenRejectDialog()
+    {
+        _rejectionReason = string.Empty;
+
+        _errorMessage = null;
+
+        _showRejectDialog = true;
+    }
+
+
+    private void CloseRejectDialog()
+    {
+        if (!_processing)
+        {
+            _showRejectDialog = false;
+        }
+    }
+
+
+    // =========================================================
+    // Reject
+    // =========================================================
+
+    private async Task RejectRequest()
+    {
+        if (string.IsNullOrWhiteSpace(
+            _rejectionReason))
+        {
+            _errorMessage =
+                "Rejection reason is required.";
+
+            return;
+        }
+
+        if (_rejectionReason.Trim().Length > 500)
+        {
+            _errorMessage =
+                "Rejection reason cannot exceed 500 characters.";
+
+            return;
+        }
+
+        _processing = true;
+
+        _errorMessage = null;
+
+        try
+        {
+            await ApiClient.RejectRequestAsync(
+                Id,
+                new RejectReplenishmentRequestDto
+                {
+                    Reason =
+                        _rejectionReason.Trim()
+                });
+
+            _showRejectDialog = false;
+
+            await LoadRequest();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Unable to reject request: {ex.Message}";
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+
+    // =========================================================
+    // Fulfillment Quantity
+    // =========================================================
+
+    private int GetFulfilledQuantity(int itemId)
+    {
+        return _fulfillmentQuantities.TryGetValue(
+            itemId,
+            out var quantity)
+            ? quantity
+            : 0;
+    }
+
+
+    private void SetFulfilledQuantity(
+        int itemId,
+        int quantity)
+    {
+        _fulfillmentQuantities[itemId] =
+            quantity;
+    }
+
+
+    // =========================================================
+    // Fulfill
+    // =========================================================
+
+    private async Task FulfillRequest()
+    {
+        _fulfillmentError = null;
+
+        if (_request is null)
+        {
+            _fulfillmentError =
+                "Request could not be loaded.";
+
+            return;
+        }
+
+        if (_request.Items is null ||
+            _request.Items.Count == 0)
+        {
+            _fulfillmentError =
+                "The request contains no items.";
+
+            return;
+        }
+
+
+        // -----------------------------------------------------
+        // Validate quantities
+        // -----------------------------------------------------
+
+        foreach (var item in _request.Items)
+        {
+            var fulfilled =
+                GetFulfilledQuantity(item.Id);
+
+            if (fulfilled < 0)
+            {
+                _fulfillmentError =
+                    $"Fulfilled quantity for " +
+                    $"{item.ArticleNumber} cannot be negative.";
+
+                return;
+            }
+
+            if (fulfilled >
+                item.RequestedQuantity)
+            {
+                _fulfillmentError =
+                    $"Fulfilled quantity for " +
+                    $"{item.ArticleNumber} cannot exceed " +
+                    $"{item.RequestedQuantity}.";
+
+                return;
+            }
+        }
+
+
+        // -----------------------------------------------------
+        // Build API request
+        // -----------------------------------------------------
+
+        var fulfillmentItems =
+            _request.Items
+                .Select(item =>
+                    new FulfillReplenishmentRequestItemDto
+                    {
+                        ItemId = item.Id,
+
+                        FulfilledQuantity =
+                            GetFulfilledQuantity(item.Id)
+                    })
+                .ToList();
+
+
+        // -----------------------------------------------------
+        // Send request
+        // -----------------------------------------------------
+
+        _processing = true;
+
+        try
+        {
+            await ApiClient.FulfillRequestAsync(
+                Id,
+                new FulfillReplenishmentRequestDto
+                {
+                    Items = fulfillmentItems
+                });
+
+            await LoadRequest();
+
+            _fulfillmentQuantities.Clear();
+        }
+        catch (Exception ex)
+        {
+            _fulfillmentError =
+                $"Unable to fulfill request: {ex.Message}";
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+
+    // =========================================================
+    // Navigation
+    // =========================================================
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo(
+            "/requests");
+    }
+
+
+    // =========================================================
+    // UI Helpers
+    // =========================================================
+
+    private static Color GetPriorityColor(
+        string priority)
+    {
+        return priority switch
+        {
+            "Urgent" => Color.Error,
+
+            "Normal" => Color.Primary,
+
+            "Low" => Color.Default,
+
+            _ => Color.Default
+        };
+    }
+
+
+    private static Color GetStatusColor(
+        string status)
+    {
+        return status switch
+        {
+            "Draft" => Color.Default,
+
+            "Submitted" => Color.Warning,
+
+            "Approved" => Color.Info,
+
+            "Rejected" => Color.Error,
+
+            "Fulfilled" => Color.Success,
+
+            _ => Color.Default
+        };
+    }
+
+
+    private static Color GetValidationColor(
+        string validationStatus)
+    {
+        return validationStatus switch
+        {
+            "Pending" => Color.Warning,
+
+            "Available" => Color.Success,
+
+            "Unavailable" => Color.Error,
+
+            "Failed" => Color.Error,
+
+            _ => Color.Default
+        };
+    }
+
+
+    private static Severity GetValidationSeverity(
+        string validationStatus)
+    {
+        return validationStatus switch
+        {
+            "Available" => Severity.Success,
+
+            "Unavailable" => Severity.Error,
+
+            "Failed" => Severity.Error,
+
+            "Pending" => Severity.Info,
+
+            _ => Severity.Normal
+        };
+    }
+
+
+    // =========================================================
+    // Dispose
+    // =========================================================
+
+    public void Dispose()
+    {
+        _pollCancellationTokenSource?.Cancel();
+
+        _pollCancellationTokenSource?.Dispose();
+
+        _pollCancellationTokenSource = null;
+    }
+}

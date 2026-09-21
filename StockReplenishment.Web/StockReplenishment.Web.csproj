@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MudBlazor" Version="9.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\StockReplenishment.API\StockReplenishment.API.csproj" />
     <ProjectReference Include="..\StockReplenishment.Application\StockReplenishment.Application.csproj" />
   </ItemGroup>
