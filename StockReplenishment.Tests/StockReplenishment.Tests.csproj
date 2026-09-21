@@ -17,8 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\StockReplenishment.API\StockReplenishment.API.csproj" />
     <ProjectReference Include="..\StockReplenishment.Application\StockReplenishment.Application.csproj" />
     <ProjectReference Include="..\StockReplenishment.Domain\StockReplenishment.Domain.csproj" />
+    <ProjectReference Include="..\StockReplenishment.Infrastructure\StockReplenishment.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
